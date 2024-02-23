@@ -1,0 +1,2 @@
+Epoch [1/1000000], Loss: 1.1002, Accuracy: 0.3442, Val Loss: 1.0963, Val Accuracy: 0.2970
+Epoch [2/1000000], Loss: 1.0978, Accuracy: 0.3439, Val Loss: 1.0958, Val Accuracy: 0.3039

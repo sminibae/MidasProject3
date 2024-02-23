@@ -188,7 +188,7 @@ def get_current_price(client, symbol):
         return f"An error occurred: {e}"
     
 def how_much_amount(balance, current_price, leverage):
-    amount = (balance/current_price)*leverage//0.001*0.001
+    amount = (balance/current_price)*leverage//0.01*0.01
     return amount
     
 

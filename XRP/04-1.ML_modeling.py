@@ -1,39 +1,26 @@
 # imports
-import pandas as pd
 import numpy as np
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-import joblib, gc, os
+import joblib, gc
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import LinearSVC, NuSVC, SVC
 import xgboost as xgb
-
-# Get the current absolute path of the directory where this script is located
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 
 def MLs(seq_length):
-    # Construct the full file paths
-    matrix_array_path = os.path.join(BASE_DIR, f'Data/matrix_array_{seq_length}_normalized.npy')
-    answer_array_path = os.path.join(BASE_DIR, f'Data/answer_array_{seq_length}.npy')
 
-    # Before loading, check if the files exist to ensure the paths are correct
-    if os.path.exists(matrix_array_path) and os.path.exists(answer_array_path):
-        matrix_array = np.load(matrix_array_path)
-        answer_array = np.load(answer_array_path)
-        print("Files loaded successfully.")
-    else:
-        print("One or more file paths are incorrect or the files do not exist.")
+    matrix_array = np.load(f'Data/matrix_array_{seq_length}_normalized.npy')
+    answer_array = np.load(f'Data/answer_array_{seq_length}.npy')
+    print("Data load Done.")
 
     X = matrix_array
     y = answer_array
 
     X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.1, random_state=1, stratify=y)
+
+    del X_test, y_test
+    gc.collect()
 
     # Flatten the X_train data
     # This assumes X_train is a list of numpy arrays with a shape of (20, 19)
@@ -57,55 +44,6 @@ def MLs(seq_length):
     gc.collect()
 
     print('saved RFC model')
-
-
-    # ### Linear SVC 
-    # Initialize the LinearSVC model
-    linear_svc = LinearSVC(random_state=0)
-
-    # Fit the model
-    linear_svc.fit(X_train_flattened, y_train_transformed)
-
-    joblib.dump(linear_svc, f'Models/Linear_SVC_model_{seq_length}.pkl')
-
-    del linear_svc
-    gc.collect()
-
-    print('saved Linear SVC model')
-
-    # ### Nu SVC
-
-    # Initialize the NuSVC model
-    # The nu parameter may need to be adjusted based on your dataset
-    nu_svc = NuSVC(nu=0.5, random_state=0)
-
-    # Fit the model
-    nu_svc.fit(X_train_flattened, y_train_transformed)
-
-    # Assuming your model is named RFC
-    joblib.dump(nu_svc, f'Models/Nu_SVC_model_{seq_length}.pkl')
-
-    del nu_svc
-    gc.collect()
-
-    print('saved NuSVC model')
-
-    # ### SVC
-    # Initialize the SVC model
-    # You can change the kernel to 'linear', 'poly', 'rbf', 'sigmoid', etc.
-    svc = SVC(kernel='rbf', random_state=0)
-
-    # Fit the model
-    svc.fit(X_train_flattened, y_train_transformed)
-
-    # Assuming your model is named RFC
-    joblib.dump(svc, f'Models/SVC_model_{seq_length}.pkl')
-
-    del svc
-    gc.collect()
-
-    print('saved SVC model')
-
 
 
     # Assuming y_train is a list or array of arrays like [[1, 0, 0], [0, 1, 0], [0, 0, 1], ...]

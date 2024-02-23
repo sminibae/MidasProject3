@@ -59,55 +59,6 @@ def MLs(seq_length):
     print('saved RFC model')
 
 
-    # ### Linear SVC 
-    # Initialize the LinearSVC model
-    linear_svc = LinearSVC(random_state=0)
-
-    # Fit the model
-    linear_svc.fit(X_train_flattened, y_train_transformed)
-
-    joblib.dump(linear_svc, f'Models/Linear_SVC_model_{seq_length}.pkl')
-
-    del linear_svc
-    gc.collect()
-
-    print('saved Linear SVC model')
-
-    # ### Nu SVC
-
-    # Initialize the NuSVC model
-    # The nu parameter may need to be adjusted based on your dataset
-    nu_svc = NuSVC(nu=0.5, random_state=0)
-
-    # Fit the model
-    nu_svc.fit(X_train_flattened, y_train_transformed)
-
-    # Assuming your model is named RFC
-    joblib.dump(nu_svc, f'Models/Nu_SVC_model_{seq_length}.pkl')
-
-    del nu_svc
-    gc.collect()
-
-    print('saved NuSVC model')
-
-    # ### SVC
-    # Initialize the SVC model
-    # You can change the kernel to 'linear', 'poly', 'rbf', 'sigmoid', etc.
-    svc = SVC(kernel='rbf', random_state=0)
-
-    # Fit the model
-    svc.fit(X_train_flattened, y_train_transformed)
-
-    # Assuming your model is named RFC
-    joblib.dump(svc, f'Models/SVC_model_{seq_length}.pkl')
-
-    del svc
-    gc.collect()
-
-    print('saved SVC model')
-
-
-
     # Assuming y_train is a list or array of arrays like [[1, 0, 0], [0, 1, 0], [0, 0, 1], ...]
     y_train_transformed = np.array([1 if np.argmax(y) == 0 else (0 if np.argmax(y) == 2 else 2) for y in y_train])
     # answer = chunk.iloc[i+19][['plus_6', 'minus_6', 'zero_6']].tolist()
