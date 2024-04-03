@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import csv
 import datetime
+from multiprocessing import Pool, cpu_count
 
 def find_threshold_crossing(df, start_index, percent):
     # Ensure the start_index is valid
@@ -38,35 +39,73 @@ def find_threshold_crossing(df, start_index, percent):
 
     return up_cross, down_cross
 
-# read csv
-df = pd.read_csv('Data/historical_XRPUSDT_3min_data.csv')
 
-# save all result into csv
-csv_path = "Data/up_down_cross_3min_data.csv"
-if not os.path.exists(csv_path): # Write header
-    index =['up_cross','down_cross']
+def save_chunks(df, chunk_size=1000, overlap=7*24*20):
+    num_rows = len(df)
+    chunks = [(start, min(start + chunk_size + overlap, num_rows)) for start in range(0, num_rows, chunk_size)]
+    
+    for i, (start, end) in enumerate(chunks):
+        chunk_df = df.iloc[start:end]
+        chunk_df.to_csv(f'Data/temp_{i}.csv', index=False)
+
+
+def process_chunk(chunk_num, chunk_size=1000):
+    df = pd.read_csv(f'Data/temp_{chunk_num}.csv')
+    csv_path = f'Data/up_down_cross_temp_{chunk_num}.csv'
     with open(csv_path, mode='a', newline='') as file:
         writer = csv.writer(file)
+        index = ['up_cross', 'down_cross']
         writer.writerow(index)
-    restart_index = 0
-
-else:
-    restart_index = len(pd.read_csv(csv_path))
-# Write the chunk to the CSV file
-with open(csv_path, mode='a', newline='') as file:
-    writer = csv.writer(file)
-    print(f'{restart_index}/{len(df)} restarting...')
-
-    for i in range(restart_index, len(df)):
-        # calculate up down cross
-        up_cross, down_cross = find_threshold_crossing(df=df, start_index=i, percent=1)
-        output = [up_cross, down_cross]
-        writer.writerow(output)
         file.flush()
 
-        if i % 1000 == 0:
-            current_time = datetime.datetime.now().strftime("%H:%M")
-            print(f'{i}/{len(df)} processing... Time: {current_time}')
+        for i in range(chunk_size):
+            up_cross, down_cross = find_threshold_crossing(df=df, start_index=i, percent=1)
+            writer.writerow([up_cross, down_cross])
+            file.flush()
+
+            if i % 1000 == 0:
+                current_time = datetime.datetime.now().strftime("%H:%M")
+                print(f'chunk {chunk_num}, {i}/{len(df)} processing... Time: {current_time}')
 
 
+def run_parallel_processing(num_chunks):
+    with Pool(processes=cpu_count()-1) as pool:
+        pool.map(process_chunk, range(num_chunks))
+
+
+def concatenate_results(num_chunks, final_path='Data/up_down_cross_3min_data.csv'):
+    with open(final_path, 'w', newline='') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(['up_cross', 'down_cross'])  # Writing header
+        for i in range(num_chunks):
+            with open(f'Data/up_down_cross_temp_{i}.csv', 'r') as infile:
+                reader = csv.reader(infile)
+                next(reader)  # Skip header
+                for row in reader:
+                    writer.writerow(row)
+                    outfile.flush()
+  
+
+def cleanup_temp_files(num_chunks):
+    for i in range(num_chunks):
+        os.remove(f'Data/temp_{i}.csv')
+        os.remove(f'Data/up_down_cross_temp_{i}.csv')
+
+
+if __name__ == '__main__':
+    # read csv
+    df = pd.read_csv('Data/historical_XRPUSDT_3min_data.csv')
+    num_chunks = len(df)//1000+1
+    # crop df into 1000+7*24*20 size chunks
+    save_chunks(df=df)
+
+    # parallel process the chunks
+    run_parallel_processing(num_chunks=num_chunks)
+
+    # concatenate results
+    concatenate_results(num_chunks=num_chunks)
+
+    # clean up temp files
+    cleanup_temp_files(num_chunks=num_chunks)
+    
     
