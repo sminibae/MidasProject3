@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 import csv
-import datetime
+from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
 def find_threshold_crossing(df, start_index, percent):
@@ -64,7 +64,7 @@ def process_chunk(chunk_num, chunk_size=1000):
             file.flush()
 
             if i % 1000 == 0:
-                current_time = datetime.datetime.now().strftime("%H:%M")
+                current_time = datetime.now().strftime("%H:%M")
                 print(f'chunk {chunk_num}, {i}/{len(df)} processing... Time: {current_time}')
 
 
