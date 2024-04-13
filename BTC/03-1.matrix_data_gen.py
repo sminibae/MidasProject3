@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import multiprocessing
 import os, gc
+from sklearn.preprocessing import StandardScaler
+import joblib
 
 
 data = pd.read_csv('Data/df_all.csv')
@@ -79,23 +81,23 @@ for i, chunk in enumerate(data_chunks):
 
 
 
-def process_chunk(chunk, chunk_index):
+def process_chunk(chunk, chunk_index, seq_length):
     matrix_list = []
     answer_list = []
 
-    if len(chunk) >= 80:
-        for i in range(len(chunk) - 79):
-            matrix = chunk.drop(columns=['plus_6', 'minus_6', 'zero_6'], axis=1).iloc[i:i+80].values
+    if len(chunk) >= seq_length:
+        for i in range(len(chunk) - (seq_length-1)):
+            matrix = chunk.drop(columns=['plus_6', 'minus_6', 'zero_6'], axis=1).iloc[i:i+seq_length].values
             matrix_list.append(matrix)
-            answer = chunk.iloc[i+59][['plus_6', 'minus_6', 'zero_6']].tolist()
+            answer = chunk.iloc[i+(seq_length-1)][['plus_6', 'minus_6', 'zero_6']].tolist()
             answer_list.append(answer)
 
             if i%1000 == 0:
-                print(f'for {chunk_index}th chunk, {i}/{len(chunk)} processing...')
+                print(f'for seq length: {seq_length}, {chunk_index}th chunk, {i}/{len(chunk)} processing...')
 
     # Save the processed data
-    np.save(f'Data/matrix_array_80_{chunk_index}.npy', np.array(matrix_list))
-    np.save(f'Data/answer_array_80_{chunk_index}.npy', np.array(answer_list))
+    np.save(f'Data/matrix_array_{seq_length}_{chunk_index}.npy', np.array(matrix_list))
+    np.save(f'Data/answer_array_{seq_length}_{chunk_index}.npy', np.array(answer_list))
 
     del matrix_list, answer_list
     gc.collect()
@@ -110,29 +112,58 @@ def process_chunk_wrapper(args):
 
 if __name__ == '__main__':
     # Assuming data_chunks is your list of chunks
-    chunk_data = [(chunk, index) for index, chunk in enumerate(data_chunks)]
+    seq_lengths = [20, 40, 60, 80]
+    # Modify chunk_data to include every combination of chunks, indices, and sequence lengths
+    chunk_data_with_seq_length = [(chunk, index, seq_length) for index, chunk in enumerate(data_chunks) for seq_length in seq_lengths]
 
+    
     with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
-        pool.map(process_chunk_wrapper, chunk_data)
+        pool.map(process_chunk_wrapper, chunk_data_with_seq_length)
     
+    # concatenate the npy files
+    for seq_length in seq_lengths:
+        # List of file names to load
+        file_names_matrix = [f"Data/matrix_array_{seq_length}_{i}.npy" for i in range(11)]  # Adjust range as needed
+        file_names_answer = [f"Data/answer_array_{seq_length}_{i}.npy" for i in range(11)]
 
-    # List of file names to load
-    file_names_matrix = [f"Data/matrix_array_80_{i}.npy" for i in range(11)]  # Adjust range as needed
-    file_names_answer = [f"Data/answer_array_80_{i}.npy" for i in range(11)]
+        # Load each file and store in a list
+        loaded_arrays_matrix = [np.load(file_name) for file_name in file_names_matrix]
+        loaded_arrays_answer = [np.load(file_name) for file_name in file_names_answer]
 
-    # Load each file and store in a list
-    loaded_arrays_matrix = [np.load(file_name) for file_name in file_names_matrix]
-    loaded_arrays_answer = [np.load(file_name) for file_name in file_names_answer]
+        # Concatenate all arrays into a single array
+        matrix_array = np.concatenate(loaded_arrays_matrix, axis=0)
+        answer_array = np.concatenate(loaded_arrays_answer, axis=0)
 
-    # Concatenate all arrays into a single array
-    matrix_array_80 = np.concatenate(loaded_arrays_matrix, axis=0)
-    answer_array_80 = np.concatenate(loaded_arrays_answer, axis=0)
+        # save the concatenated array
+        np.save(f'Data/matrix_array_{seq_length}.npy', matrix_array)
+        np.save(f'Data/answer_array_{seq_length}.npy', answer_array)
 
-    # save the concatenated array
-    np.save('Data/matrix_array_80.npy', matrix_array_80)
-    np.save('Data/answer_array_80.npy', answer_array_80)
+        # delete _0 ~ _10 .npy files
+        for file_name in file_names_matrix + file_names_answer:
+            os.remove(file_name)
+        
+        del file_name, file_names_matrix, file_names_answer, loaded_arrays_matrix, loaded_arrays_answer, matrix_array, answer_array
+        gc.collect()
 
-    # delete _0 ~ _10 .npy files
-    for file_name in file_names_matrix + file_names_answer:
-        os.remove(file_name)
-    
+    # normalize the matrix & save scaler
+    for seq_length in seq_lengths:
+        matrix_array = np.load(f'Data/matrix_array_{seq_length}.npy')
+        answer_array = np.load(f'Data/answer_array_{seq_length}.npy')
+
+        # Assuming data is your 600k matrices concatenated into a single 3D numpy array of shape (600000, 20, 19)
+        matrix_array_reshaped = matrix_array.reshape(-1, 19)  # Reshape to 2D for standardization
+        scaler = StandardScaler()
+        matrix_array_normalized = scaler.fit_transform(matrix_array_reshaped)
+
+        # Reshape back to 3D
+        matrix_array_normalized = matrix_array_normalized.reshape(-1, seq_length, 19)
+
+        folder_path2 = 'Scalers'
+        if not os.path.exists(folder_path2):
+            os.mkdir(folder_path2)
+        joblib.dump(scaler, f'Scalers/StandardScaler_{seq_length}.pkl')
+
+        np.save(f'Data/matrix_array_{seq_length}_normalized.npy', matrix_array_normalized)
+
+        del matrix_array, answer_array, matrix_array_reshaped, matrix_array_normalized
+        gc.collect()

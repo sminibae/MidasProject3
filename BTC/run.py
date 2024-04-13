@@ -23,8 +23,8 @@ Secret_Key = keys[1]
 #  client
 client = Client(api_key=API_Key, api_secret=Secret_Key)
 
-model = joblib.load('Models/RFC_model_60.pkl')
-scaler = joblib.load('Scalers/StandardScaler_60.pkl')
+model = joblib.load('Models/RFC_model_80.pkl')
+scaler = joblib.load('Scalers/StandardScaler_80.pkl')
 
 '''------------------------------'''
 
@@ -106,7 +106,7 @@ def get_binance_server_time_unix(client):
     
 def fetch_and_prepare_data(client):
     # Fetch historical candle data
-    candles = client.get_klines(symbol='BTCUSDT', interval=KLINE_INTERVAL_3MINUTE, limit=301)
+    candles = client.get_klines(symbol='BTCUSDT', interval=KLINE_INTERVAL_3MINUTE, limit=321)
 
     # Create DataFrame
     df = pd.DataFrame(candles, columns=['Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
@@ -133,7 +133,7 @@ def fetch_and_prepare_data(client):
     df.drop(['BB_std'], axis=1, inplace=True)
     df.dropna(inplace=True)
 
-    df = df.tail(60)
+    df = df.tail(80)
     
     df = np.array(df)
 
@@ -314,7 +314,7 @@ def start_trading(client,symbol, leverage=10,SL=10):
         temp_normalized = scaler.transform(temp)
 
         # Reshape back to 2D
-        matrix_normalized = temp_normalized.reshape(-1,19*60)
+        matrix_normalized = temp_normalized.reshape(-1,19*80)
         
         # prediction
         prediction = model.predict(matrix_normalized)[0]
@@ -406,7 +406,7 @@ def start_trading(client,symbol, leverage=10,SL=10):
 
     except BinanceAPIException as e:
         message = f"An error occurred: {e}"
-        return np.zeros((60,19)), [-2,0], message, 0, 0, 0, 0, 0, 0
+        return np.zeros((80,19)), [-2,0], message, 0, 0, 0, 0, 0, 0
         #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
 
 
@@ -417,6 +417,11 @@ def recovery(client, symbol, SL=10):
     try:
         # first, find out if we are trading.
         current_position = get_current_position(client, symbol)
+        while type(current_position) == str:
+            print(current_position)
+            current_position = get_current_position(client, symbol)
+
+
         time.sleep(0.125)
         position_amount = float(current_position['positionAmt'])
         amount = np.abs(position_amount)
@@ -434,7 +439,7 @@ def recovery(client, symbol, SL=10):
             # both remains
             if len(open_orders) == 2:
                 message = 'no problem'
-                return np.zeros((60,19)), np.zeros((2,)), message, 0,0,0,0,0,0
+                return np.zeros((80,19)), np.zeros((2,)), message, 0,0,0,0,0,0
                 #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
             
             
@@ -461,7 +466,7 @@ def recovery(client, symbol, SL=10):
                     print(SL_trade)
                     time.sleep(0.125)
 
-                    return np.zeros((60,19)), np.zeros((2,)), message, direction, 0,amount*entry_price, entry_price, 0, StopLoss
+                    return np.zeros((80,19)), np.zeros((2,)), message, direction, 0,amount*entry_price, entry_price, 0, StopLoss
                     #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
 
                 else:  # Only SL remains
@@ -476,7 +481,7 @@ def recovery(client, symbol, SL=10):
                     print(TP_trade)
                     time.sleep(0.125)
 
-                    return np.zeros((60,19)), np.zeros((2,)), message, direction, 0, amount*entry_price, entry_price, TakeProfit, 0
+                    return np.zeros((80,19)), np.zeros((2,)), message, direction, 0, amount*entry_price, entry_price, TakeProfit, 0
                     #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
 
             # no open order remains
@@ -504,14 +509,14 @@ def recovery(client, symbol, SL=10):
                 print(TP_trade)
                 time.sleep(0.125)
 
-                return np.zeros((60,19)), np.zeros((2,)), message, direction, 0, amount*entry_price, entry_price, TakeProfit, StopLoss
+                return np.zeros((80,19)), np.zeros((2,)), message, direction, 0, amount*entry_price, entry_price, TakeProfit, StopLoss
                 #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
             
             # more than 3 open order remains
             else:
                 message = 'more than 3 open orders'
                 print(message)
-                return np.zeros((60,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
+                return np.zeros((80,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
                 #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
         
             
@@ -524,23 +529,23 @@ def recovery(client, symbol, SL=10):
             # no open order remains
             if len(open_orders) == 0:
                 message = 'no problem'
-                return np.zeros((60,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
+                return np.zeros((80,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
                 #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
 
             # if 1 open order remains
             elif len(open_orders) == 1:
-                type = open_orders[0]['type']
+                order_type = open_orders[0]['type']
 
-                if type == 'LIMIT':
+                if order_type == 'LIMIT':
                     message = 'lost'
-                elif type == 'STOP_MARKET':
+                elif order_type == 'STOP_MARKET':
                     message = 'win'
                 print(message)
                
                 cancel_all_orders = cancel_all_futures_orders(client, symbol)
                 time.sleep(0.125)
 
-                return np.zeros((60,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
+                return np.zeros((80,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
                 #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
 
             # if 2 open order remains
@@ -550,7 +555,7 @@ def recovery(client, symbol, SL=10):
                 cancel_all_orders = cancel_all_futures_orders(client, symbol)
                 time.sleep(0.125)
 
-                return np.zeros((60,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
+                return np.zeros((80,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
                 #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
             
 
@@ -558,7 +563,7 @@ def recovery(client, symbol, SL=10):
         if '2021' in str(e):
             close_positions_and_cancel_orders_for_symbol(client, symbol)
         message = f"An error occurred: {e}"
-        return np.zeros((60,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
+        return np.zeros((80,19)), np.zeros((2,)), message, 0, 0, 0, 0, 0, 0
         #return market_condition, prediction, message, direction, balance, balance on trade, entry price, take profit, stop loss
 
 
@@ -650,7 +655,7 @@ def close_positions_and_cancel_orders_for_symbol(client, symbol):
 
 def run():
     try:
-        model = joblib.load('Models/RFC_model_60.pkl')
+        model = joblib.load('Models/RFC_model_80.pkl')
         print('Model Load Success')
     except Exception as e:
         print(f"Model loading error: {e}")

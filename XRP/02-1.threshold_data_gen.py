@@ -96,6 +96,7 @@ if __name__ == '__main__':
     # read csv
     df = pd.read_csv('Data/historical_XRPUSDT_3min_data.csv')
     num_chunks = len(df)//1000+1
+    
     # crop df into 1000+7*24*20 size chunks
     save_chunks(df=df)
 
