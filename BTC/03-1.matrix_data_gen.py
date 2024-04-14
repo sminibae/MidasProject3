@@ -5,10 +5,20 @@ import multiprocessing
 import os, gc
 from sklearn.preprocessing import StandardScaler
 import joblib
+from datetime import datetime, timezone
 
 
 data = pd.read_csv('Data/df_all.csv')
 data = data.drop(['Ignore','up_cross','down_cross','minutes','log_minutes','side'], axis=1)
+
+# Convert ISO 8601 date strings to Unix timestamp (milliseconds)
+def iso_to_unix(iso_str):
+    dt = datetime.strptime(iso_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return int(dt.timestamp() * 1000)  # Convert to milliseconds
+
+end_time = iso_to_unix("2024-01-01T00:00:00Z")
+
+data = data[data['Open time']<=end_time]
 
 
 

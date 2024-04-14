@@ -5,6 +5,7 @@ import joblib, gc, os
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+
 import xgboost as xgb
 
 
@@ -46,24 +47,24 @@ def MLs(seq_length):
     print('saved RFC model')
 
 
-    # Assuming y_train is a list or array of arrays like [[1, 0, 0], [0, 1, 0], [0, 0, 1], ...]
-    y_train_transformed = np.array([1 if np.argmax(y) == 0 else (0 if np.argmax(y) == 2 else 2) for y in y_train])
-    # answer = chunk.iloc[i+19][['plus_6', 'minus_6', 'zero_6']].tolist()
-    # 1 = up , 2 = down, 0 = zero
+    # # Assuming y_train is a list or array of arrays like [[1, 0, 0], [0, 1, 0], [0, 0, 1], ...]
+    # y_train_transformed = np.array([1 if np.argmax(y) == 0 else (0 if np.argmax(y) == 2 else 2) for y in y_train])
+    # # answer = chunk.iloc[i+19][['plus_6', 'minus_6', 'zero_6']].tolist()
+    # # 1 = up , 2 = down, 0 = zero
 
 
-    # Initialize the XGBoost classifier
-    XGB = xgb.XGBClassifier(objective='multi:softprob', random_state=0)  # multi:softprob for multi-class classification
+    # # Initialize the XGBoost classifier
+    # XGB = xgb.XGBClassifier(objective='multi:softprob', random_state=0)  # multi:softprob for multi-class classification
 
-    # Fit the model
-    XGB.fit(X_train_flattened, y_train_transformed)
-    # Assuming your model is named RFC
-    joblib.dump(XGB, f'Models/XGB_model_{seq_length}.pkl')
+    # # Fit the model
+    # XGB.fit(X_train_flattened, y_train_transformed)
+    # # Assuming your model is named RFC
+    # joblib.dump(XGB, f'Models/XGB_model_{seq_length}.pkl')
 
-    del XGB
-    gc.collect() 
+    # del XGB
+    # gc.collect() 
     
-    print('saved XGB model')
+    # print('saved XGB model')
 
 if __name__ == '__main__':
     folder_path = 'Models'
