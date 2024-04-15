@@ -226,23 +226,15 @@ def init_weights(m):
                 # For a GRU, the bias is a single vector with `2*hidden_size` elements
                 # It may be beneficial to initialize the parts corresponding to the reset and update gates to 1
                 n = param.size(0)
-                param[n//4:n//2].fill_(1)  # Update gate bias
+                new_param = param.clone()
+                new_param[n//4:n//2].fill_(1)  # Update gate bias
+                param.data = new_param
 
     elif isinstance(m, nn.Conv1d):
         # Initialize Conv1D layers with He initialization
         init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
         if m.bias is not None:
             init.constant_(m.bias, 0)
-
-    elif isinstance(m, nn.TransformerEncoder) or isinstance(m, nn.TransformerEncoderLayer):
-        # Initialize Transformer weights using a more suitable scheme
-        # Usually, Transformer weights are initialized slightly differently to prevent early saturation
-        # and help convergence. A common practice is using xavier_uniform with gain adjusted for non-linearity.
-        for name, param in m.named_parameters():
-            if 'weight' in name:
-                init.xavier_uniform_(param, gain=init.calculate_gain('relu'))
-            elif 'bias' in name:
-                init.constant_(param, 0)
 
     elif isinstance(m, nn.Linear):
         init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='linear')
@@ -251,6 +243,26 @@ def init_weights(m):
     elif isinstance(m, nn.BatchNorm1d):
         init.constant_(m.weight, 1)
         init.constant_(m.bias, 0)
+
+def init_weights_Transformer(m):
+    if isinstance(m, nn.Linear):
+        # Apply Xavier initialization to the weights of Linear layers
+        init.xavier_uniform_(m.weight, gain=init.calculate_gain('relu'))
+        # Initialize biases to zero
+        if m.bias is not None:
+            init.constant_(m.bias, 0)
+    elif isinstance(m, nn.BatchNorm1d):
+        # Initialize BatchNorm1d layers
+        init.constant_(m.weight, 1)
+        init.constant_(m.bias, 0)
+    elif isinstance(m, nn.TransformerEncoder) or isinstance(m, nn.TransformerEncoderLayer):
+        # Initialize Transformer's weights with appropriate method and biases to zero
+        for name, param in m.named_parameters():
+            if 'weight' in name and param.dim() > 1:
+                init.xavier_uniform_(param, gain=init.calculate_gain('relu'))
+            elif 'bias' in name:
+                init.constant_(param, 0)
+
 
 class LSTMModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
@@ -504,7 +516,7 @@ class TransformerModel(nn.Module):
         self.output_layer = nn.Linear(16, output_dim)
 
         # Apply the custom initializer to all layers
-        self.apply(init_weights)
+        self.apply(init_weights_Transformer)
 
 
     def forward(self, src):
