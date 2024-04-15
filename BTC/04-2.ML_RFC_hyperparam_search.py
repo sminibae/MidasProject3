@@ -77,8 +77,7 @@ if __name__ == '__main__':
 
     # Assuming grid_search has completed
     results = pd.DataFrame(grid_search.cv_results_)
-    results_sorted = results.sort_values(by='rank_test_score')
-    results.to_csv('Data/grid_search_results.csv', header=None)
+    results.to_csv('Data/grid_search_results.csv', index=False)
 
     top_5 = results_sorted.head(5)  # Adjust the number as needed
 

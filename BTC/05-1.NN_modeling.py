@@ -6,6 +6,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 
 from torch.utils.data import TensorDataset, DataLoader
 import torch.optim as optim
@@ -48,7 +49,7 @@ def data_loaders(seq_length):
     test_dataset = TensorDataset(X_test, y_test)
 
     # DataLoaders
-    batch_size = 256
+    batch_size = 128
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
@@ -200,6 +201,57 @@ def training(model_name, model_instance, seq_length, train_loader, valid_loader)
     print('Saved history.json')
 
 
+def init_weights(m):
+    if isinstance(m, nn.LSTM):
+        for name, param in m.named_parameters():
+            if 'weight_ih' in name:
+                init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:
+                init.orthogonal_(param.data)
+            elif 'bias' in name:
+                param.data.fill_(0)
+
+    elif isinstance(m, nn.GRU):
+        for name, param in m.named_parameters():
+            if 'weight_ih' in name:  # Input-hidden weights
+                init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:  # Hidden-hidden weights
+                init.orthogonal_(param.data)  # Helps maintain stability
+            elif 'bias' in name:  # Biases initialization
+                # Biases could be set to zero or using a more sophisticated scheme:
+                # Setting biases such that the forget gate has initially more influence
+                param.data.fill_(0)
+                # It's common practice to initialize biases for gates to ensure better initial performance
+                # For GRUs, biases are usually split into two parts, each for input and recurrent
+                # For a GRU, the bias is a single vector with `2*hidden_size` elements
+                # It may be beneficial to initialize the parts corresponding to the reset and update gates to 1
+                n = param.size(0)
+                param[n//4:n//2].fill_(1)  # Update gate bias
+
+    elif isinstance(m, nn.Conv1d):
+        # Initialize Conv1D layers with He initialization
+        init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+        if m.bias is not None:
+            init.constant_(m.bias, 0)
+
+    elif isinstance(m, nn.TransformerEncoder) or isinstance(m, nn.TransformerEncoderLayer):
+        # Initialize Transformer weights using a more suitable scheme
+        # Usually, Transformer weights are initialized slightly differently to prevent early saturation
+        # and help convergence. A common practice is using xavier_uniform with gain adjusted for non-linearity.
+        for name, param in m.named_parameters():
+            if 'weight' in name:
+                init.xavier_uniform_(param, gain=init.calculate_gain('relu'))
+            elif 'bias' in name:
+                init.constant_(param, 0)
+
+    elif isinstance(m, nn.Linear):
+        init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='linear')
+        if m.bias is not None:
+            init.constant_(m.bias, 0)
+    elif isinstance(m, nn.BatchNorm1d):
+        init.constant_(m.weight, 1)
+        init.constant_(m.bias, 0)
+
 class LSTMModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(LSTMModel, self).__init__()
@@ -226,6 +278,9 @@ class LSTMModel(nn.Module):
 
         # Output layer
         self.output_layer = nn.Linear(16, output_dim)
+
+        # Apply the custom initializer to all layers
+        self.apply(init_weights)
 
     def forward(self, x):
         # Pass input through LSTM layers
@@ -284,6 +339,9 @@ class GRUModel(nn.Module):
 
         # Output layer
         self.output_layer = nn.Linear(16, output_dim)
+
+        # Apply the custom initializer to all layers
+        self.apply(init_weights)
 
     def forward(self, x):
         # Pass input through GRU layers
@@ -445,6 +503,9 @@ class TransformerModel(nn.Module):
         # Output layer
         self.output_layer = nn.Linear(16, output_dim)
 
+        # Apply the custom initializer to all layers
+        self.apply(init_weights)
+
 
     def forward(self, src):
         # Assuming src shape is (batch_size, seq_length, input_dim)
@@ -557,12 +618,14 @@ class LinearModel(nn.Module):
 if __name__ == '__main__':
     print('Start')
 
-    seq_length = 40
+    seq_length = 20
     # data loaders
     train_loader, valid_loader, test_loader = data_loaders(seq_length)
     print('DataLoader Set')
     # models
     models = {
+        'LSTM' : LSTMModel(input_dim=19, hidden_dim=128, output_dim=3),
+        'GRU' : GRUModel(input_dim=19, hidden_dim=128, output_dim=3, num_layers=3),
         'Conv1D' : Conv1DModel(num_features=19, output_dim=3, seq_length=seq_length),
         'Transformer' :  TransformerModel(input_dim=19, output_dim=3, seq_length=seq_length, num_classes=3, \
                                         d_model=64, nhead=4, num_encoder_layers=2, dim_feedforward=256, dropout=0.1),
@@ -571,28 +634,5 @@ if __name__ == '__main__':
 
     for model_name, model_instance in models.items():
         training(model_name, model_instance, seq_length, train_loader, valid_loader)
-    
-    print('Done for 40')
 
-    seq_lengths = [60, 80]
-    for seq_length in seq_lengths:
-
-        # data loaders
-        train_loader, valid_loader, test_loader = data_loaders(seq_length)
-        print('DataLoader Set')
-
-        # models
-        models = {
-            'LSTM' : LSTMModel(input_dim=19, hidden_dim=128, output_dim=3),
-            'GRU' : GRUModel(input_dim=19, hidden_dim=128, output_dim=3, num_layers=3),
-            'Conv1D' : Conv1DModel(num_features=19, output_dim=3, seq_length=seq_length),
-            'Transformer' :  TransformerModel(input_dim=19, output_dim=3, seq_length=seq_length, num_classes=3, \
-                                            d_model=64, nhead=4, num_encoder_layers=2, dim_feedforward=256, dropout=0.1),
-            "Linear" : LinearModel(seq_length=seq_length, input_dim=19, output_dim=3),
-        }
-
-        for model_name, model_instance in models.items():
-            training(model_name, model_instance, seq_length, train_loader, valid_loader)
-        
-    
     print('Done')
